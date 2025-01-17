@@ -33,6 +33,12 @@ class MigrateMemberData extends AbstractMigration {
 
   public function shouldRun(): bool
   {
+    $schemaManager = $this->connection->createSchemaManager();
+    $columns = $schemaManager->listTableColumns('tl_member');
+    if (!isset($columns['has_collection'])) {
+      return false;
+    }
+
     $collectionCount = $this->connection->executeQuery("SELECT COUNT(*) FROM `tl_jvh_db_collection`")->fetchOne();
     $memberCount = $this->connection->executeQuery("SELECT COUNT(*) FROM `tl_member` WHERE `has_collection` != '0'")->fetchOne();
     if ($collectionCount && !$memberCount) {
