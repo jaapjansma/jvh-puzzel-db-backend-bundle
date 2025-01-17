@@ -1,0 +1,12 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  JvH\JvHPuzzelDbBackendBundle\Cron\SendCollectionEmailCron: ~
+  JvH\JvHPuzzelDbBackendBundle\Cron\SendProductEmailCron: ~
+  JvH\JvHPuzzelDbBackendBundle\EventListener\CollectionUpdatedListener: ~
+  JvH\JvHPuzzelDbBackendBundle\EventListener\LabelCallbackListener: ~
+  JvH\JvHPuzzelDbBackendBundle\Migration\MigrateMemberData:
+    tags:
+      - { name: contao.migration, priority: 0 }
