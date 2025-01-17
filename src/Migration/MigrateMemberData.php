@@ -70,42 +70,45 @@ class MigrateMemberData extends AbstractMigration {
 
     $strQuery = "SELECT COUNT(*) FROM `tl_jvh_db_collection` WHERE `member` = ? AND collection = ? GROUP BY member";
     try {
-      $collection_count = $this->connection->executeQuery($strQuery, [$member->id, CollectionModel::COLLECTION])->fetchOne() ?? 0;
+      $collection_count = $this->connection->executeQuery($strQuery, [$id, CollectionModel::COLLECTION])->fetchOne() ?? 0;
     } catch (Exception $e) {
 
     }
     try {
-      $wishlist_count = $this->connection->executeQuery($strQuery, [$member->id, CollectionModel::WISHLIST])->fetchOne() ?? 0;
+      $wishlist_count = $this->connection->executeQuery($strQuery, [$id, CollectionModel::WISHLIST])->fetchOne() ?? 0;
     } catch (Exception $e) {
 
     }
 
-    try {
-    $collection_create_date = $this->connection->executeQuery("SELECT MIN(`tstamp`) FROM `tl_jvh_db_collection` WHERE `member` = ?", [$member->id])->fetchOne();
-    } catch (Exception $e) {
+    if ($wishlist_count > 0 || $collection_count > 0) {
 
-    }
-    if (empty($collection_create_date)) {
-      $collection_create_date = time();
-    }
+      try {
+        $collection_create_date = $this->connection->executeQuery("SELECT MIN(`tstamp`) FROM `tl_jvh_db_collection` WHERE `member` = ?", [$id])->fetchOne();
+      } catch (Exception $e) {
 
-    try {
-      $collection_update_date = $this->connection->executeQuery("SELECT MAX(`tstamp`) FROM `tl_jvh_db_collection` WHERE `member` = ?", [$member->id])->fetchOne();
-    } catch (Exception $e) {
+      }
+      if (empty($collection_create_date)) {
+        $collection_create_date = time();
+      }
 
-    }
-    if (empty($collection_update_date)) {
-      $collection_update_date = time();
-    }
+      try {
+        $collection_update_date = $this->connection->executeQuery("SELECT MAX(`tstamp`) FROM `tl_jvh_db_collection` WHERE `member` = ?", [$id])->fetchOne();
+      } catch (Exception $e) {
 
-    if (!$collection_count) {
-      $collection_count = 0;
-    }
-    if (!$wishlist_count) {
-      $wishlist_count = 0;
-    }
+      }
+      if (empty($collection_update_date)) {
+        $collection_update_date = time();
+      }
 
-    $this->connection->executeQuery("UPDATE `tl_member` SET `has_collection` = 1, `collection_count` = ?, `wishlist_count` = ?, `collection_create_date` = ?, `collection_update_date` = ? WHERE `id` = ?", [$collection_count, $wishlist_count, $collection_create_date, $collection_update_date, $id]);
+      if (!$collection_count) {
+        $collection_count = 0;
+      }
+      if (!$wishlist_count) {
+        $wishlist_count = 0;
+      }
+
+      $this->connection->executeQuery("UPDATE `tl_member` SET `has_collection` = 1, `collection_count` = ?, `wishlist_count` = ?, `collection_create_date` = ?, `collection_update_date` = ? WHERE `id` = ?", [$collection_count, $wishlist_count, $collection_create_date, $collection_update_date, $id]);
+    }
   }
 
 
