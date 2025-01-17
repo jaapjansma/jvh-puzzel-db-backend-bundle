@@ -40,7 +40,7 @@ class MigrateMemberData extends AbstractMigration {
     }
 
     $collectionCount = $this->connection->executeQuery("SELECT COUNT(*) FROM `tl_jvh_db_collection`")->fetchOne();
-    $memberCount = $this->connection->executeQuery("SELECT COUNT(*) FROM `tl_member` WHERE `has_collection` != '0'")->fetchOne();
+    $memberCount = $this->connection->executeQuery("SELECT COUNT(*) FROM `tl_member` WHERE `has_collection` > '0'")->fetchOne();
     if ($collectionCount && !$memberCount) {
       return true;
     }
