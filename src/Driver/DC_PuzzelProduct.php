@@ -33,7 +33,12 @@ use Contao\StringUtil;
 use Contao\System;
 use Contao\Widget;
 use JvH\JvHPuzzelDbBundle\Model\CollectionModel;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBagInterface;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\String\UnicodeString;
 
 class DC_PuzzelProduct extends DC_Table {
@@ -83,6 +88,7 @@ class DC_PuzzelProduct extends DC_Table {
       unset($GLOBALS['TL_DCA'][$strTable]['fields'][$k]['sorting']);
     }
     $GLOBALS['TL_DCA'][$strTable]['fields']['count']['label'] = $GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['count'];
+    $GLOBALS['TL_DCA'][$this->strRealTable]['list']['global_operations'] = $GLOBALS['TL_DCA'][$strTable]['list']['global_operations'];
 
     parent::__construct($this->strRealTable, $arrModule);
   }
@@ -897,9 +903,8 @@ class DC_PuzzelProduct extends DC_Table {
     $objRow = $objRowStmt->execute($this->values);
     // Display buttos
     $return = Message::generate() . '
-<div id="tl_buttons">' . ((Input::get('act') == 'select' || $this->ptable) ? '
-<a href="' . $this->getReferer(true, $this->ptable) . '" class="header_back" title="' . StringUtil::specialchars($GLOBALS['TL_LANG']['MSC']['backBTTitle']) . '" accesskey="b" onclick="Backend.getScrollOffset()">' . $GLOBALS['TL_LANG']['MSC']['backBT'] . '</a> ' : (isset($GLOBALS['TL_DCA'][$this->strTable]['config']['backlink']) ? '
-<a href="' . System::getContainer()->get('router')->generate('contao_backend') . '?' . $GLOBALS['TL_DCA'][$this->strTable]['config']['backlink'] . '" class="header_back" title="' . StringUtil::specialchars($GLOBALS['TL_LANG']['MSC']['backBTTitle']) . '" accesskey="b" onclick="Backend.getScrollOffset()">' . $GLOBALS['TL_LANG']['MSC']['backBT'] . '</a> ' : '')) . ((Input::get('act') != 'select' && !($GLOBALS['TL_DCA'][$this->strTable]['config']['closed'] ?? null) && !($GLOBALS['TL_DCA'][$this->strTable]['config']['notCreatable'] ?? null)) ? '
+<div id="tl_buttons">
+<a href="' . $this->getReferer(true, $this->strRealTable) . '" class="header_back" title="' . StringUtil::specialchars($GLOBALS['TL_LANG']['MSC']['backBTTitle']) . '" accesskey="b" onclick="Backend.getScrollOffset()">' . $GLOBALS['TL_LANG']['MSC']['backBT'] . '</a> ' . ((Input::get('act') != 'select' && !($GLOBALS['TL_DCA'][$this->strAliasTable]['config']['closed'] ?? null) && !($GLOBALS['TL_DCA'][$this->strAliasTable]['config']['notCreatable'] ?? null)) ? '
  ' : '') . $this->generateGlobalButtons() . '
 </div>';
 
@@ -1354,6 +1359,271 @@ class DC_PuzzelProduct extends DC_Table {
       return $this->collectionCount[$memberId];
     }
     return 0;
+  }
+
+  protected function export()
+  {
+    $this->procedure[] = '`'. $this->strRealTable . '`.`id`=?';
+    $this->values[] = $this->intProductId;
+    if ($this->intCollection) {
+      $this->procedure[] = '`tl_jvh_db_collection`.`collection`=?';
+      $this->values[] = $this->intCollection;
+    }
+
+    // Custom filter
+    if (!empty($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['sorting']['filter']) && \is_array($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['sorting']['filter']))
+    {
+      foreach ($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['sorting']['filter'] as $filter)
+      {
+        if (\is_string($filter))
+        {
+          $this->procedure[] = $filter;
+        }
+        else
+        {
+          $this->procedure[] = $filter[0];
+          $this->values[] = $filter[1];
+        }
+      }
+    }
+    $_originalTable = $this->strTable;
+    $this->strTable = $this->strRealTable;
+    $table = ($GLOBALS['TL_DCA'][$this->strTable]['list']['sorting']['mode'] ?? null) == self::MODE_TREE_EXTENDED ? $this->ptable : $this->strTable;
+    $orderBy = $GLOBALS['TL_DCA'][$this->strAliasTable]['list']['sorting']['fields'] ?? array('id');
+    $firstOrderBy = preg_replace('/\s+.*$/', '', $orderBy[0]);
+
+    if (\is_array($this->orderBy) && !empty($this->orderBy[0]))
+    {
+      $orderBy = $this->orderBy;
+      $firstOrderBy = $this->firstOrderBy;
+    }
+
+    // Check the default labels (see #509)
+    $labelNew = $GLOBALS['TL_LANG'][$this->strTable]['new'] ?? $GLOBALS['TL_LANG']['DCA']['new'];
+
+    //$this->strTable = $this->strAliasTable;
+    $query = "SELECT `tl_member`.*, `tl_jvh_db_collection`.`puzzel_product`, `tl_jvh_db_collection`.`collection` FROM " . $this->strTable;
+    $query .= " INNER JOIN `tl_jvh_db_collection` ON `".$this->strTable."`.`id` = `tl_jvh_db_collection`.`puzzel_product`";
+    $query .= " INNER JOIN `tl_member` ON `tl_jvh_db_collection`.`member` = `tl_member`.`id`";
+
+    if (!empty($this->procedure))
+    {
+      $query .= " WHERE " . implode(' AND ', $this->procedure);
+    }
+
+    if (!empty($this->root) && \is_array($this->root))
+    {
+      $query .= (!empty($this->procedure) ? " AND " : " WHERE ") . "id IN(" . implode(',', array_map('\intval', $this->root)) . ")";
+    }
+
+    $query .= " GROUP BY `tl_member`.`id`";
+
+    if (\is_array($orderBy) && $orderBy[0])
+    {
+      foreach ($orderBy as $k=>$v)
+      {
+        list($key, $direction) = explode(' ', $v, 2) + array(null, null);
+
+        $orderBy[$k] = $key;
+
+        // If there is no direction, check the global flag in sorting mode 1 or the field flag in all other sorting modes
+        if (!$direction)
+        {
+          if (($GLOBALS['TL_DCA'][$this->strTable]['list']['sorting']['mode'] ?? null) == self::MODE_SORTED && isset($GLOBALS['TL_DCA'][$this->strTable]['list']['sorting']['flag']) && ($GLOBALS['TL_DCA'][$this->strTable]['list']['sorting']['flag'] % 2) == 0)
+          {
+            $direction = 'DESC';
+          }
+          elseif (isset($GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['flag']) && ($GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['flag'] % 2) == 0)
+          {
+            $direction = 'DESC';
+          }
+        }
+
+        if (isset($GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['foreignKey']))
+        {
+          $chunks = explode('.', $GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['foreignKey'], 2);
+          $orderBy[$k] = "(SELECT " . Database::quoteIdentifier($chunks[1]) . " FROM " . $chunks[0] . " WHERE " . $chunks[0] . ".id=" . $this->strTable . "." . $key . ")";
+        }
+
+        if (\in_array($GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['flag'] ?? null, array(self::SORT_DAY_ASC, self::SORT_DAY_DESC, self::SORT_MONTH_ASC, self::SORT_MONTH_DESC, self::SORT_YEAR_ASC, self::SORT_YEAR_DESC)))
+        {
+          $orderBy[$k] = "CAST(" . $orderBy[$k] . " AS SIGNED)"; // see #5503
+        }
+
+        if ($direction)
+        {
+          $orderBy[$k] .= ' ' . $direction;
+        }
+
+        if ($GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['eval']['findInSet'] ?? null)
+        {
+          if (\is_array($GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['options_callback'] ?? null))
+          {
+            $strClass = $GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['options_callback'][0];
+            $strMethod = $GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['options_callback'][1];
+
+            $this->import($strClass);
+            $keys = $this->$strClass->$strMethod($this);
+          }
+          elseif (\is_callable($GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['options_callback'] ?? null))
+          {
+            $keys = $GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['options_callback']($this);
+          }
+          else
+          {
+            $keys = $GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['options'] ?? array();
+          }
+
+          if (($GLOBALS['TL_DCA'][$this->strTable]['fields'][$key]['eval']['isAssociative'] ?? null) || ArrayUtil::isAssoc($keys))
+          {
+            $keys = array_keys($keys);
+          }
+
+          $orderBy[$k] = $this->Database->findInSet($v, $keys);
+        }
+      }
+
+      if (($GLOBALS['TL_DCA'][$this->strTable]['list']['sorting']['mode'] ?? null) == self::MODE_SORTED_PARENT)
+      {
+        $firstOrderBy = 'pid';
+        $showFields = $GLOBALS['TL_DCA'][$table]['list']['label']['fields'];
+
+        $query .= " ORDER BY (SELECT " . Database::quoteIdentifier($showFields[0]) . " FROM " . $this->ptable . " WHERE " . $this->ptable . ".id=" . $this->strTable . ".pid), " . implode(', ', $orderBy) . ', id';
+
+        // Set the foreignKey so that the label is translated
+        if (!($GLOBALS['TL_DCA'][$table]['fields']['pid']['foreignKey'] ?? null))
+        {
+          $GLOBALS['TL_DCA'][$table]['fields']['pid']['foreignKey'] = $this->ptable . '.' . $showFields[0];
+        }
+
+        // Remove the parent field from label fields
+        array_shift($showFields);
+        $GLOBALS['TL_DCA'][$table]['list']['label']['fields'] = $showFields;
+      }
+      else
+      {
+        $query .= " ORDER BY " . implode(', ', $orderBy) . ', id';
+      }
+    }
+
+    $objRowStmt = $this->Database->prepare($query);
+
+    if ($this->limit)
+    {
+      $arrLimit = explode(',', $this->limit) + array(null, null);
+      $objRowStmt->limit($arrLimit[1], $arrLimit[0]);
+    }
+
+    $objRow = $objRowStmt->execute($this->values);
+    $result = $objRow->fetchAllAssoc();
+    // Automatically add the "order by" field as last column if we do not have group headers
+    if (($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['label']['showColumns'] ?? null) && false !== ($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['label']['showFirstOrderBy'] ?? null))
+    {
+      $blnFound = false;
+
+      // Extract the real key and compare it to $firstOrderBy
+      foreach ($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['label']['fields'] as $f)
+      {
+        if (strpos($f, ':') !== false)
+        {
+          list($f) = explode(':', $f, 2);
+        }
+
+        if ($firstOrderBy == $f)
+        {
+          $blnFound = true;
+          break;
+        }
+      }
+
+      if (!$blnFound)
+      {
+        $GLOBALS['TL_DCA'][$this->strAliasTable]['list']['label']['fields'][] = $firstOrderBy;
+      }
+    }
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+    $colNr = 1;
+    $rowNr = 1;
+
+    // Generate the table header if the "show columns" option is active
+    if ($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['label']['showColumns'] ?? null)
+    {
+      foreach ($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['label']['fields'] as $f)
+      {
+        if (strpos($f, ':') !== false)
+        {
+          list($f) = explode(':', $f, 2);
+        }
+        $sheet->setCellValue([$colNr, $rowNr], (\is_array($GLOBALS['TL_DCA'][$this->strAliasTable]['fields'][$f]['label'] ?? null) ? $GLOBALS['TL_DCA'][$this->strAliasTable]['fields'][$f]['label'][0] : ($GLOBALS['TL_DCA'][$this->strAliasTable]['fields'][$f]['label'] ?? $f)));
+        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($rowNr))->setAutoSize(TRUE);
+        $sheet->getStyle([$colNr, $rowNr])->getFont()->setBold(TRUE);
+        $sheet->getStyle([$colNr, $rowNr])->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_TEXT);
+        $colNr++;
+      }
+    }
+
+    foreach ($result as $row)
+    {
+      $rowNr ++;
+      $colNr = 1;
+      $this->current[] = $row['id'];
+      $label = $this->generateRecordLabel($row, $this->strTable);
+
+      if (!\is_array($label))
+      {
+        $label = array($label);
+      }
+
+      // Show columns
+      if ($GLOBALS['TL_DCA'][$this->strAliasTable]['list']['label']['showColumns'] ?? null)
+      {
+        foreach ($label as $j=>$arg)
+        {
+          $field = $GLOBALS['TL_DCA'][$this->strAliasTable]['list']['label']['fields'][$j] ?? null;
+
+          if (isset($GLOBALS['TL_DCA'][$this->strTable]['fields'][$field]['foreignKey']))
+          {
+            if ($arg)
+            {
+              $key = explode('.', $GLOBALS['TL_DCA'][$this->strTable]['fields'][$field]['foreignKey'], 2);
+
+              $reference = $this->Database
+                ->prepare("SELECT " . Database::quoteIdentifier($key[1]) . " AS value FROM " . $key[0] . " WHERE id=?")
+                ->limit(1)
+                ->execute($arg);
+
+              if ($reference->numRows)
+              {
+                $arg = $reference->value;
+              }
+            }
+
+            $value = $arg ?: '-';
+          }
+          else
+          {
+            $value = (string) $arg !== '' ? $arg : '-';
+          }
+          $sheet->setCellValue([$colNr, $rowNr], $value);
+          $colNr++;
+        }
+      }
+    }
+    $this->strTable = $_originalTable;
+
+    $writer = new Xlsx($spreadsheet);
+    $response =  new StreamedResponse(
+      function () use ($writer) {
+        $writer->save('php://output');
+      }
+    );
+    $response->headers->set('Content-Type', 'application/vnd.ms-excel');
+    $response->headers->set('Content-Disposition', 'attachment;filename="'.$this->strAliasTable.'_'.date('ymd').'.xlsx"');
+    $response->headers->set('Cache-Control','max-age=0');
+    $response->send();
+    exit();
   }
 
 }

@@ -66,6 +66,14 @@ $GLOBALS['TL_DCA']['tl_jvh_db_collections'] = array
     ),
     'global_operations' => array
     (
+      'export' => array
+      (
+        'label'               =>  &$GLOBALS['TL_LANG']['tl_jvh_db_collections']['export'],
+        'href'                => 'act=export',
+        'class'               => 'header_export',
+        'attributes'          => 'onclick="Backend.getScrollOffset()"',
+        'icon'                => 'tablewizard.svg',
+      ),
       'all' => array
       (
         'href'                => 'act=select',

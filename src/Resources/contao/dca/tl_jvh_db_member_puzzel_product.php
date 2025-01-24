@@ -34,7 +34,6 @@ $GLOBALS['TL_DCA']['tl_jvh_db_member_puzzel_product'] = array
         'id' => 'primary'
       )
     ),
-    //'ptable' => 'tl_jvh_db_puzzel_product',
     'notEditable' => true,
     'notDeletable' => true,
     'notCopyable' => true,
@@ -68,6 +67,14 @@ $GLOBALS['TL_DCA']['tl_jvh_db_member_puzzel_product'] = array
     ),
     'global_operations' => array
     (
+      'export' => array
+      (
+        'label'               =>  &$GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['export'],
+        'href'                => 'act=export',
+        'class'               => 'header_export',
+        'attributes'          => 'onclick="Backend.getScrollOffset()"',
+        'icon'                => 'tablewizard.svg',
+      ),
       'all' => array
       (
         'href'                => 'act=select',

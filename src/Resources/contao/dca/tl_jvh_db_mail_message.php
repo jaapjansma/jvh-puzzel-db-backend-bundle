@@ -50,6 +50,12 @@ $GLOBALS['TL_DCA']['tl_jvh_db_mail_message'] = [
     'msg' => [
       'sql' => "text NOT NULL default ''",
     ],
+    'subject_en' => [
+      'sql' => "varchar(255) NOT NULL default ''",
+    ],
+    'msg_en' => [
+      'sql' => "text NOT NULL default ''",
+    ],
     'product_id' => [
       'foreignKey' => 'tl_jvh_puzzel_product.id',
       'sql' => "int(10) unsigned NULL default '0'",

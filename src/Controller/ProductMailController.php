@@ -51,7 +51,16 @@ class ProductMailController {
         $db = Database::getInstance();
         $rows = $db->prepare("SELECT * FROM `tl_jvh_db_mail_message` WHERE (`product_id` IS NOT NULL AND `product_id` > 0) ORDER BY `id` ASC")->limit($limit)->execute();
         while($row = $rows->fetchAssoc()) {
+          $language = $GLOBALS['TL_LANGUAGE'];
+          $emailLanguage = null;
           $objMember = MemberModel::findByPk($row['pid']);
+          if ($objMember && !empty($objMember->language)) {
+            $emailLanguage = $objMember->language;
+          }
+          if ($emailLanguage === null) {
+            $emailLanguage = 'nl_NL';
+          }
+          $GLOBALS['TL_LANGUAGE'] = $emailLanguage;
           $arrTokens = [];
           foreach ($objMember->row() as $k => $v) {
             $arrTokens = $this->flatten($v, 'member_' . $k, $arrTokens, $delimiter);
@@ -63,11 +72,16 @@ class ProductMailController {
           $arrTokens['recipient_email'] = $objMember->email;
           $arrTokens['subject'] = $row['subject'];
           $arrTokens['message'] = $row['msg'];
+          if ($GLOBALS['TL_LANGUAGE'] != 'nl' && $GLOBALS['TL_LANGUAGE'] != 'nl_NL') {
+            $arrTokens['subject'] = $row['subject_en'];
+            $arrTokens['message'] = $row['msg_en'];
+          }
           $objNotificationCollection->reset();
           while ($objNotificationCollection->next()) {
               $objNotification = $objNotificationCollection->current();
               $objNotification->send($arrTokens, $GLOBALS['TL_LANGUAGE']);
           }
+          $GLOBALS['TL_LANGUAGE'] = $language;
           $processedIds[] = $row['id'];
         }
         if (count($processedIds)) {
@@ -95,45 +109,65 @@ class ProductMailController {
         }
         $productId = Input::get('product_id');
 
-        $arrSubject = [
-            'label'     => $GLOBALS['TL_LANG']['tl_jvh_db_collections']['send_email_subject'],
+        $arrSubjectNl = [
+            'label'     => $GLOBALS['TL_LANG']['tl_jvh_db_collections']['send_email_subject_nl'],
             'inputType' => 'text',
             'eval'      => array('mandatory'=>true, 'required' => true, 'rte'=>'tinyMCE'),
         ];
-        $arrSubjectWidget = \Contao\TextField::getAttributesFromDca($arrSubject, 'subject');
-        $objSubjectWidget = new \Contao\TextField($arrSubjectWidget);
+        $arrSubjectNlWidget = \Contao\TextField::getAttributesFromDca($arrSubjectNl, 'subject_nl');
+        $objSubjectNlWidget = new \Contao\TextField($arrSubjectNlWidget);
+        $arrSubjectEn = [
+          'label'     => $GLOBALS['TL_LANG']['tl_jvh_db_collections']['send_email_subject_en'],
+          'inputType' => 'text',
+          'eval'      => array('mandatory'=>true, 'required' => true, 'rte'=>'tinyMCE'),
+        ];
+        $arrSubjectEnWidget = \Contao\TextField::getAttributesFromDca($arrSubjectEn, 'subject_en');
+        $objSubjectEnWidget = new \Contao\TextField($arrSubjectEnWidget);
 
-        $arrMessageField = [
-            'label'     => $GLOBALS['TL_LANG']['tl_jvh_db_collections']['send_email_message'],
+        $arrMessageNlField = [
+            'label'     => $GLOBALS['TL_LANG']['tl_jvh_db_collections']['send_email_message_nl'],
             'inputType' => 'textarea',
             'eval'      => array('mandatory'=>true, 'required' => true, 'rte'=>'tinyMCE'),
         ];
-        $arrMessageWidget = \Contao\TextArea::getAttributesFromDca($arrMessageField, 'message');
-        $objMessageWidget = new \Contao\TextArea($arrMessageWidget);
+        $arrMessageNlWidget = \Contao\TextArea::getAttributesFromDca($arrMessageNlField, 'message_nl');
+        $objMessageNlWidget = new \Contao\TextArea($arrMessageNlWidget);
+        $arrMessageEnField = [
+          'label'     => $GLOBALS['TL_LANG']['tl_jvh_db_collections']['send_email_message_en'],
+          'inputType' => 'textarea',
+          'eval'      => array('mandatory'=>true, 'required' => true, 'rte'=>'tinyMCE'),
+        ];
+        $arrMessageEnWidget = \Contao\TextArea::getAttributesFromDca($arrMessageEnField, 'message_en');
+        $objMessageEnWidget = new \Contao\TextArea($arrMessageEnWidget);
 
         if (\Input::post('FORM_SUBMIT') === 'tl_jvh_db_collections_send_email') {
-            $objSubjectWidget->validate();
-            $objMessageWidget->validate();
+            $objSubjectNlWidget->validate();
+            $objMessageNlWidget->validate();
+            $objSubjectEnWidget->validate();
+            $objMessageEnWidget->validate();
 
-            if ($objSubjectWidget->hasErrors() || $objMessageWidget->hasErrors()) {
+            if ($objSubjectEnWidget->hasErrors() || $objMessageEnWidget->hasErrors() || $objSubjectNlWidget->hasErrors() || $objMessageNlWidget->hasErrors()) {
                 $doNotSubmit = true;
             } else {
-                $values['subject'] = $objSubjectWidget->value;
-                $values['message'] = $objMessageWidget->value;
+                $values['subject_nl'] = $objSubjectNlWidget->value;
+                $values['message_nl'] = $objMessageNlWidget->value;
+                $values['subject_en'] = $objSubjectEnWidget->value;
+                $values['message_en'] = $objMessageEnWidget->value;
             }
         }
 
-        $strBuffer .= '<div class="clr widget">'.$objSubjectWidget->parse().'</div>';
-        $strBuffer .= '<div class="clr widget">'.$objMessageWidget->parse().$this->addFileBrowser('ctrl_message').'</div>';
+        $strBuffer .= '<div class="clr widget">'.$objSubjectNlWidget->parse().'</div>';
+        $strBuffer .= '<div class="clr widget">'.$objMessageNlWidget->parse().$this->addFileBrowser('ctrl_message_nl').'</div>';
+        $strBuffer .= '<div class="clr widget">'.$objSubjectEnWidget->parse().'</div>';
+        $strBuffer .= '<div class="clr widget">'.$objMessageEnWidget->parse().$this->addFileBrowser('ctrl_message_en').'</div>';
 
         if (\Input::post('FORM_SUBMIT') === 'tl_jvh_db_collections_send_email' && !$doNotSubmit) {
             /** @var Connection $connection */
             $connection = System::getContainer()->get('database_connection');
             $db = Database::getInstance();
-            $sql = "INSERT INTO `tl_jvh_db_mail_message` (`pid`, `subject`, `msg`, `tstamp`, `product_id`) VALUES ";
+            $sql = "INSERT INTO `tl_jvh_db_mail_message` (`pid`, `subject`, `msg`, `subject_en`, `msg_en`, `tstamp`, `product_id`) VALUES ";
             $data = [];
             foreach($ids as $id) {
-                $data[] = "(" . $connection->quote($id) . ', ' . $connection->quote($values['subject'])  . ', ' . $connection->quote($values['message'])  . ', '. time() . ', ' . $productId . ')';
+                $data[] = "(" . $connection->quote($id) . ', ' . $connection->quote($values['subject_nl'])  . ', ' . $connection->quote($values['message_nl'])  . ', ' . $connection->quote($values['subject_en'])  . ', ' . $connection->quote($values['message_en']) . ', '  .  time() . ', ' . $productId . ')';
             }
             if (count($data)) {
                 $sql .= implode(", ", $data);

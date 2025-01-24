@@ -18,6 +18,9 @@
 
 $GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['send_email'] = ['Verstuur e-mail', 'Verstuur e-mail'];
 $GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['send_mail_headline'] = 'Verstuur e-mail (%s)';
-$GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['send_email_subject'] = 'Onderwerp';
-$GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['send_email_message'] = 'Bericht';
+$GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['send_email_subject_nl'] = 'Onderwerp (Nederlands)';
+$GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['send_email_message_nl'] = 'Bericht (Nederlands)';
+$GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['send_email_subject_en'] = 'Onderwerp (Engels)';
+$GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['send_email_message_en'] = 'Bericht (Engels)';
 $GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['count'] = ['Aantal', ''];
+$GLOBALS['TL_LANG']['tl_jvh_db_member_puzzel_product']['export'] = ['Export', 'Export'];
