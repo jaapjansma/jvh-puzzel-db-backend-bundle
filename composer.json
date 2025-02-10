@@ -3,11 +3,12 @@
   "description":"Jan van Haasteren Puzzel Database Backend.",
   "type": "contao-bundle",
   "license":"AGPL-3.0-or-later",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "require": {
     "contao/core-bundle": "^4.13",
     "isotope/isotope-core": "^2.8",
-    "jvh/puzzel-db-bundle": "^1.1"
+    "jvh/puzzel-db-bundle": "^1.1",
+    "phpoffice/phpspreadsheet": "^1.23"
   },
   "extra": {
     "contao-manager-plugin": "JvH\\JvHPuzzelDbBackendBundle\\ContaoManager\\Plugin"

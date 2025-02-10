@@ -19,6 +19,7 @@
 namespace JvH\JvHPuzzelDbBackendBundle\EventListener;
 
 use Contao\Backend;
+use JvH\JvHPuzzelDbBundle\Driver\DC_Withexport;
 use JvH\JvHPuzzelDbBundle\Event\LabelCallback;
 use JvH\JvHPuzzelDbBundle\Model\CollectionModel;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -57,11 +58,15 @@ class LabelCallbackListener implements EventSubscriberInterface {
     $collectCountKey = array_search('collection_count', $fields, true);
     $collectWishlistKey = array_search('wishlist_count', $fields, true);
     $id = $event->row['id'];
-    if (isset($event->labels[$collectCountKey]) && $event->labels[$collectCountKey] > 0) {
+    $exporting = false;
+    if ($event->dc instanceof DC_Withexport && $event->dc->isExporting()) {
+      $exporting = true;
+    }
+    if (!$exporting && isset($event->labels[$collectCountKey]) && $event->labels[$collectCountKey] > 0) {
       $href = Backend::addToUrl("table=tl_jvh_db_member_puzzel_product&product_id=".$id."&collection=".CollectionModel::COLLECTION);
       $event->labels[$collectCountKey] = '<a href="' . $href . '">' . $event->labels[$collectCountKey] . '</a>';
     }
-    if (isset($event->labels[$collectWishlistKey]) && $event->labels[$collectWishlistKey] > 0) {
+    if (!$exporting && isset($event->labels[$collectWishlistKey]) && $event->labels[$collectWishlistKey] > 0) {
       $href = Backend::addToUrl("table=tl_jvh_db_member_puzzel_product&product_id=".$id."&collection=".CollectionModel::WISHLIST);
       $event->labels[$collectWishlistKey] = '<a href="' . $href . '">' . $event->labels[$collectWishlistKey] . '</a>';
     }
