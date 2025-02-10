@@ -7,7 +7,7 @@
   "require": {
     "contao/core-bundle": "^4.13",
     "isotope/isotope-core": "^2.8",
-    "jvh/puzzel-db-bundle": "^1.1",
+    "jvh/puzzel-db-bundle": "^1.1.1",
     "phpoffice/phpspreadsheet": "^1.23"
   },
   "extra": {
