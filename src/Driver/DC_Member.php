@@ -87,6 +87,11 @@ class DC_Member extends DC_Table {
         unset($GLOBALS['TL_DCA'][$strTable]['fields'][$k]['sorting']);
       }
     }
+    if (isset($GLOBALS['TL_DCA'][$strTable]['list']['sorting']['searchFields']) && is_array($GLOBALS['TL_DCA'][$strTable]['list']['sorting']['searchFields'])) {
+      foreach($GLOBALS['TL_DCA'][$strTable]['list']['sorting']['searchFields'] as $searchField) {
+        $GLOBALS['TL_DCA'][$strTable]['fields'][$searchField]['search'] = true;
+      }
+    }
     $GLOBALS['TL_DCA'][$this->strRealTable]['list']['global_operations'] = $GLOBALS['TL_DCA'][$strTable]['list']['global_operations'];
     parent::__construct($this->strRealTable, $arrModule);
   }

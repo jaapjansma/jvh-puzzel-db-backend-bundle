@@ -52,8 +52,9 @@ $GLOBALS['TL_DCA']['tl_jvh_db_collections'] = array
     (
       'mode'                    => 2,
       'fields'                  => array('country', 'collection_count', 'wishlist_count', 'collection_create_date', 'collection_update_date'),
+      'searchFields'            => array('firstname', 'lastname', 'email'),
       'flag'                    => 11,
-      'panelLayout'             => 'filter;sort,limit',
+      'panelLayout'             => 'filter;search;sort,limit',
       'filter'                  => array("has_collection = '1'")
     ),
     'filtering' => array (
